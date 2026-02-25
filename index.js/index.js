@@ -1,52 +1,38 @@
 require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
-const OpenAI = require('openai');
-const twilio = require('twilio');
-const cron = require('node-cron');
+const express = require('express');
+const app = express();
+app.use(express.urlencoded({ extended: false }));
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const sms = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+// This is the "Doorbell" Twilio will ring
+app.post('/sms', async (req, res) => {
+    const incomingMsg = req.body.Body;
+    const fromNumber = req.body.From;
 
-const delay = ms => new Promise(res => setTimeout(res, ms));
+    console.log(`📩 New message from ${fromNumber}: ${incomingMsg}`);
 
-async function runRetainFitAgent() {
-  console.log("🚀 STARTING GLOBAL AUDIT...");
+    // 1. Ask the AI for a smart reply based on our Retainfit logic
+    const aiResponse = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+            { role: "system", content: "You are the Retainfit Premium Gym Assistant. Answer the gym owner professionally." },
+            { role: "user", content: incomingMsg }
+        ],
+    });
 
-  // 1. Fetch all gyms that have paid and are active
-  const { data: gyms, error: gymError } = await supabase
-    .from('Gyms')
-    .select('*')
-    .eq('Is_active', true);
+    const replyText = aiResponse.choices[0].message.content;
 
-  if (gymError) return console.error("Gym Error:", gymError);
+    // 2. Send the reply back through Twilio
+    await twilioClient.messages.create({
+        body: replyText,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: fromNumber
+    });
 
-  for (const gym of gyms) {
-    console.log(`📍 Processing ${gym.Owner_name}'s Gym (ID: ${gym.id})`);
-
-    // 2. Fetch only members for THIS specific gym
-    const { data: members, error: memError } = await supabase
-      .from('members')
-      .select('*')
-      .eq('gym_id', gym.id);
-
-    if (memError) continue;
-
-    for (const member of members) {
-      // (The rest of your logic tree: Ghost, Slipper, Superstar)
-      // This part ensures personalized messages for every gym's members
-      console.log(`🤖 Analyzing ${member.first_name}...`);
-      
-      // AI Logic & Twilio Sending here...
-      
-      await delay(2000); 
-    }
-  }
-}
-
-// Set it for 9:00 AM daily
-cron.schedule('0 9 * * *', () => {
-  runRetainFitAgent();
+    res.status(200).send('Message Handled');
 });
 
-console.log("🤖 Multi-Tenant Agent is STANDING BY for all gyms.");
+// Start the 24/7 listener on Port 3000
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Retainfit Live Listener is active on port ${PORT}`);
+});
