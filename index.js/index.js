@@ -1,3 +1,5 @@
+const twilio = require('twilio');
+const twilioClient = new twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const OpenAI = require('openai'); // This is what was missing!
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 require('dotenv').config();
