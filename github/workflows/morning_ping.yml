@@ -1,0 +1,10 @@
+name: Morning Gym Audit
+on:
+  schedule:
+    - cron: '0 9 * * *' # 9:00 AM UTC
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Daily Audit
+        run: curl -X POST https://retain-fit-agent.onrender.com/sms/daily-audit
